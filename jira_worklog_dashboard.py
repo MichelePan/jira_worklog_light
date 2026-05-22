@@ -14,16 +14,81 @@ from typing import List, Dict, Optional
 # STREAMLIT CONFIG
 # ======================
 
-st.set_page_config(page_title="Jira Worklog Dashboard", layout="wide")
+st.set_page_config(
+    page_title="Jira Worklog Dashboard",
+    layout="wide"
+)
+
 st.title("Jira Worklog Dashboard")
+
+
+# ======================
+# BASIC AUTH
+# ======================
+
+APP_USERNAME = st.secrets["APP_USERNAME"]
+APP_PASSWORD = st.secrets["APP_PASSWORD"]
+
+
+def check_login():
+
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
+
+    if st.session_state.authenticated:
+        return True
+
+    st.subheader("Login")
+
+    with st.form("login_form"):
+
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+
+        submit = st.form_submit_button("Accedi")
+
+        if submit:
+
+            if (
+                username == APP_USERNAME
+                and password == APP_PASSWORD
+            ):
+
+                st.session_state.authenticated = True
+                st.rerun()
+
+            else:
+                st.error("Credenziali non valide")
+
+    return False
+
+
+if not check_login():
+    st.stop()
+
+
+# ======================
+# LOGOUT
+# ======================
+
+with st.sidebar:
+
+    st.success("Autenticato")
+
+    if st.button("Logout"):
+
+        st.session_state.authenticated = False
+        st.rerun()
 
 
 # ======================
 # CONFIG (ENV VARS)
 # ======================
+
 jira_domain = st.secrets["JIRA_DOMAIN"]
 email = st.secrets["JIRA_EMAIL"]
 api_token = st.secrets["JIRA_API_TOKEN"]
+
 default_jql = "project = KAN"
 
 if not jira_domain or not email or not api_token:
@@ -31,10 +96,17 @@ if not jira_domain or not email or not api_token:
     st.stop()
 
 BASE_URL = f"https://{jira_domain}/rest/api/3"
+
 AUTH = HTTPBasicAuth(email, api_token)
 
-HEADERS_JSON = {"Accept": "application/json", "Content-Type": "application/json"}
-HEADERS_GET = {"Accept": "application/json"}
+HEADERS_JSON = {
+    "Accept": "application/json",
+    "Content-Type": "application/json"
+}
+
+HEADERS_GET = {
+    "Accept": "application/json"
+}
 
 MAX_WORKERS = 10
 MARGIN_DAYS = 3
@@ -60,7 +132,10 @@ def search_issues_jql_v3(base_url, auth, jql, fields=None):
 
     while True:
 
-        payload = {"jql": jql, "fields": fields}
+        payload = {
+            "jql": jql,
+            "fields": fields
+        }
 
         if next_page_token:
             payload["nextPageToken"] = next_page_token
@@ -94,11 +169,15 @@ def get_issue_worklogs_v3(base_url, auth, issue_key):
 
     start_at = 0
     max_results = 100
+
     out = []
 
     while True:
 
-        params = {"startAt": start_at, "maxResults": max_results}
+        params = {
+            "startAt": start_at,
+            "maxResults": max_results
+        }
 
         resp = requests.get(
             url,
@@ -134,7 +213,11 @@ def detect_epic_link_field():
 
     url = f"{BASE_URL}/field"
 
-    resp = requests.get(url, headers=HEADERS_GET, auth=AUTH)
+    resp = requests.get(
+        url,
+        headers=HEADERS_GET,
+        auth=AUTH
+    )
 
     if not resp.ok:
         return None
@@ -158,8 +241,15 @@ st.sidebar.header("Filtri")
 
 today = date.today()
 
-date_from = st.sidebar.date_input("Dal", today - timedelta(days=7))
-date_to = st.sidebar.date_input("Al", today)
+date_from = st.sidebar.date_input(
+    "Dal",
+    today - timedelta(days=7)
+)
+
+date_to = st.sidebar.date_input(
+    "Al",
+    today
+)
 
 if date_from > date_to:
     st.sidebar.error("Range non valido")
@@ -197,13 +287,22 @@ def cached_search_issues(jql):
     if EPIC_LINK_FIELD_ID:
         fields.append(EPIC_LINK_FIELD_ID)
 
-    return search_issues_jql_v3(BASE_URL, AUTH, jql, fields)
+    return search_issues_jql_v3(
+        BASE_URL,
+        AUTH,
+        jql,
+        fields
+    )
 
 
 @st.cache_data(ttl=TTL_WORKLOG)
 def cached_issue_worklogs(issue_key):
 
-    return get_issue_worklogs_v3(BASE_URL, AUTH, issue_key)
+    return get_issue_worklogs_v3(
+        BASE_URL,
+        AUTH,
+        issue_key
+    )
 
 
 @st.cache_data(ttl=TTL_EPIC)
@@ -223,6 +322,7 @@ def cached_issue_summary(issue_key):
         return ""
 
     data = resp.json() or {}
+
     fields = data.get("fields", {}) or {}
 
     return fields.get("summary", "") or ""
@@ -284,11 +384,17 @@ def build_dataframe(issues):
 
             summary = fields.get("summary", "")
 
-            issue_type = (fields.get("issuetype") or {}).get("name", "")
+            issue_type = (
+                fields.get("issuetype") or {}
+            ).get("name", "")
 
-            status = (fields.get("status") or {}).get("name", "")
+            status = (
+                fields.get("status") or {}
+            ).get("name", "")
 
-            owner = (fields.get("assignee") or {}).get("displayName", "")
+            owner = (
+                fields.get("assignee") or {}
+            ).get("displayName", "")
 
             est = estimate_hours(fields)
 
@@ -305,7 +411,10 @@ def build_dataframe(issues):
                 if not started:
                     continue
 
-                wl_day = datetime.strptime(started[:10], "%Y-%m-%d").date()
+                wl_day = datetime.strptime(
+                    started[:10],
+                    "%Y-%m-%d"
+                ).date()
 
                 if wl_day < date_from or wl_day > date_to:
                     continue
@@ -313,7 +422,10 @@ def build_dataframe(issues):
                 rows.append(
                     {
                         "Data": wl_day,
-                        "Utente": (wl.get("author") or {}).get("displayName", ""),
+                        "Utente": (
+                            wl.get("author") or {}
+                        ).get("displayName", ""),
+
                         "IssueType": issue_type,
                         "Issue": key,
                         "Summary": summary,
@@ -321,7 +433,16 @@ def build_dataframe(issues):
                         "EpicKey": epic,
                         "Stato": status,
                         "StimaOre": est,
-                        "Ore": round((wl.get("timeSpentSeconds", 0)) / 3600, 2),
+
+                        "Ore": round(
+                            (
+                                wl.get(
+                                    "timeSpentSeconds",
+                                    0
+                                )
+                            ) / 3600,
+                            2
+                        ),
                     }
                 )
 
@@ -330,11 +451,20 @@ def build_dataframe(issues):
     if df.empty:
         return df
 
-    epic_map = {k: cached_issue_summary(k) for k in epic_keys if str(k).strip()}
+    epic_map = {
+        k: cached_issue_summary(k)
+        for k in epic_keys
+        if str(k).strip()
+    }
 
-    df["EpicName"] = df["EpicKey"].map(epic_map).fillna("")
+    df["EpicName"] = (
+        df["EpicKey"]
+        .map(epic_map)
+        .fillna("")
+    )
 
     return df
+
 
 def create_excel_export(df):
 
@@ -353,36 +483,65 @@ def create_excel_export(df):
 
     df_export = df.copy()
 
-    # tipi corretti
-    df_export["Data"] = pd.to_datetime(df_export["Data"])
-    df_export["StimaOre"] = df_export["StimaOre"].astype(float)
-    df_export["Ore"] = df_export["Ore"].astype(float)
+    df_export["Data"] = pd.to_datetime(
+        df_export["Data"]
+    )
+
+    df_export["StimaOre"] = (
+        df_export["StimaOre"]
+        .astype(float)
+    )
+
+    df_export["Ore"] = (
+        df_export["Ore"]
+        .astype(float)
+    )
 
     df_export = df_export[cols_export]
 
     output = io.BytesIO()
 
-    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+    with pd.ExcelWriter(
+        output,
+        engine="xlsxwriter"
+    ) as writer:
 
-        df_export.to_excel(writer, index=False, sheet_name="Worklog")
+        df_export.to_excel(
+            writer,
+            index=False,
+            sheet_name="Worklog"
+        )
 
         workbook = writer.book
         worksheet = writer.sheets["Worklog"]
 
-        # formati
-        date_format = workbook.add_format({"num_format": "dd/mm/yyyy"})
-        number_format = workbook.add_format({"num_format": "0.00"})
+        date_format = workbook.add_format(
+            {"num_format": "dd/mm/yyyy"}
+        )
 
-        # applica formati
-        worksheet.set_column("A:A", 12, date_format)
-        worksheet.set_column("H:I", 12, number_format)
+        number_format = workbook.add_format(
+            {"num_format": "0.00"}
+        )
 
-        # larghezze utili
+        worksheet.set_column(
+            "A:A",
+            12,
+            date_format
+        )
+
+        worksheet.set_column(
+            "H:I",
+            12,
+            number_format
+        )
+
         worksheet.set_column("B:B", 25)
         worksheet.set_column("E:E", 50)
 
     output.seek(0)
+
     return output
+
 
 # ======================
 # LOAD DATA
@@ -407,42 +566,86 @@ if df.empty:
 # FILTRI UI
 # ======================
 
-statuses = ["(tutti)"] + sorted(df["Stato"].dropna().unique())
-status_sel = st.sidebar.selectbox("Stato", statuses)
+statuses = ["(tutti)"] + sorted(
+    df["Stato"].dropna().unique()
+)
 
-types = ["(tutti)"] + sorted(df["IssueType"].dropna().unique())
-type_sel = st.sidebar.selectbox("Issue Type", types)
+status_sel = st.sidebar.selectbox(
+    "Stato",
+    statuses
+)
+
+types = ["(tutti)"] + sorted(
+    df["IssueType"].dropna().unique()
+)
+
+type_sel = st.sidebar.selectbox(
+    "Issue Type",
+    types
+)
 
 if df["EpicName"].astype(str).str.strip().any():
 
-    epics = ["(tutte)"] + sorted(df["EpicName"].dropna().unique())
-    epic_sel = st.sidebar.selectbox("Epic", epics)
+    epics = ["(tutte)"] + sorted(
+        df["EpicName"].dropna().unique()
+    )
+
+    epic_sel = st.sidebar.selectbox(
+        "Epic",
+        epics
+    )
 
 else:
 
-    epics = ["(tutte)"] + sorted(df["EpicKey"].dropna().unique())
-    epic_sel = st.sidebar.selectbox("Epic (key)", epics)
+    epics = ["(tutte)"] + sorted(
+        df["EpicKey"].dropna().unique()
+    )
 
-users = ["(tutti)"] + sorted(df["Utente"].dropna().unique())
-user_sel = st.sidebar.selectbox("Utente", users)
+    epic_sel = st.sidebar.selectbox(
+        "Epic (key)",
+        epics
+    )
+
+users = ["(tutti)"] + sorted(
+    df["Utente"].dropna().unique()
+)
+
+user_sel = st.sidebar.selectbox(
+    "Utente",
+    users
+)
 
 df_view = df.copy()
 
 if status_sel != "(tutti)":
-    df_view = df_view[df_view["Stato"] == status_sel]
+    df_view = df_view[
+        df_view["Stato"] == status_sel
+    ]
 
 if type_sel != "(tutti)":
-    df_view = df_view[df_view["IssueType"] == type_sel]
+    df_view = df_view[
+        df_view["IssueType"] == type_sel
+    ]
 
 if epic_sel != "(tutte)":
 
     if "EpicName" in df_view.columns:
-        df_view = df_view[df_view["EpicName"] == epic_sel]
+
+        df_view = df_view[
+            df_view["EpicName"] == epic_sel
+        ]
+
     else:
-        df_view = df_view[df_view["EpicKey"] == epic_sel]
+
+        df_view = df_view[
+            df_view["EpicKey"] == epic_sel
+        ]
 
 if user_sel != "(tutti)":
-    df_view = df_view[df_view["Utente"] == user_sel]
+
+    df_view = df_view[
+        df_view["Utente"] == user_sel
+    ]
 
 
 # ======================
@@ -451,10 +654,25 @@ if user_sel != "(tutti)":
 
 c1, c2, c3, c4 = st.columns(4)
 
-c1.metric("Totale ore", f"{df_view['Ore'].sum():.2f}")
-c2.metric("Worklog", len(df_view))
-c3.metric("Issue", df_view["Issue"].nunique())
-c4.metric("Utenti", df_view["Utente"].nunique())
+c1.metric(
+    "Totale ore",
+    f"{df_view['Ore'].sum():.2f}"
+)
+
+c2.metric(
+    "Worklog",
+    len(df_view)
+)
+
+c3.metric(
+    "Issue",
+    df_view["Issue"].nunique()
+)
+
+c4.metric(
+    "Utenti",
+    df_view["Utente"].nunique()
+)
 
 st.divider()
 
@@ -466,9 +684,16 @@ st.divider()
 st.subheader("Dettaglio worklog")
 
 df_show = df_view.copy()
-df_show["Data"] = pd.to_datetime(df_show["Data"]).dt.strftime("%d/%m/%Y")
 
-st.dataframe(df_show, use_container_width=True, hide_index=True)
+df_show["Data"] = pd.to_datetime(
+    df_show["Data"]
+).dt.strftime("%d/%m/%Y")
+
+st.dataframe(
+    df_show,
+    use_container_width=True,
+    hide_index=True
+)
 
 excel_file = create_excel_export(df_view)
 
