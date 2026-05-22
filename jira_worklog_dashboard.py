@@ -26,8 +26,8 @@ st.title("Jira Worklog Dashboard")
 # BASIC AUTH
 # ======================
 
-APP_USERNAME = st.secrets["username"]
-APP_PASSWORD = st.secrets["password"]
+APP_USERNAME = st.secrets["APP_USERNAME"]
+APP_PASSWORD = st.secrets["APP_PASSWORD"]
 
 
 def check_login():
