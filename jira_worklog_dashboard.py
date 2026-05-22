@@ -21,10 +21,9 @@ st.title("Jira Worklog Dashboard")
 # ======================
 # CONFIG (ENV VARS)
 # ======================
-
-jira_domain = "allitude-anagrafe-prodotti-finanziari.atlassian.net"
-email = "m.pantano@reply.it"
-api_token = "ATATT3xFfGF0qhoqGqpZbrZENyLSmlYMPVOrjvLOX-UWRSZHt0M7pm1sQNrdZNBu1bs-ti9d-RkpaJJhDIgKiLT898GpzxGIyLhnF5j6GVhXO-AZ_Wx0tEjc8p4SI4naoyBHgBpGaXmiGWAOnuZKMgrHqKw-xpzcu15wSdkZ--tnKbJAPyseVwc=517B72C0"
+jira_domain = st.secrets["JIRA_DOMAIN"]
+email = st.secrets["JIRA_EMAIL"]
+api_token = st.secrets["JIRA_API_TOKEN"]
 default_jql = "project = KAN"
 
 if not jira_domain or not email or not api_token:
