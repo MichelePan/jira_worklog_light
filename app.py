@@ -3,7 +3,7 @@ import requests
 import streamlit as st
 import pandas as pd
 import io
-import Xlsxwriter
+import xlsxwriter
 
 from datetime import date, timedelta, datetime
 from requests.auth import HTTPBasicAuth
